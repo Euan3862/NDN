@@ -1,0 +1,221 @@
+\documentclass[12pt]{report}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{titlesec}
+\usepackage{pgfgantt}
+\usepackage{pdflscape}
+\usepackage{parskip}
+\usepackage{xcolor}
+\usepackage{acronym}
+\usepackage[
+    backend=biber,
+    style=ieee
+]{biblatex}
+
+\addbibresource{references.bib}
+\newcommand{\R}{\textcolor{red}}
+
+\titleformat{\chapter}[display]
+  {\normalfont\bfseries}
+  {\Large\chaptername\ \thechapter}
+  {1em}
+  {\fontsize{29.86}{34}\selectfont}
+\geometry{a4paper, margin=1in}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{0.5in}
+    {\Huge \textbf{CS5199 - Named Data Networking: Traffic Pattern Modelling }\par}
+    \vspace{0.3in}
+    {\Large Euan Douglas Mullen - 220012756}\par
+    \vspace{0.1in}
+    {\large Supervisor: Dr Ryo Yanagida}
+    \vspace{1in}
+    
+    \includegraphics[width=0.8\textwidth, height=0.5\textheight, keepaspectratio]{StALogo.pdf}\par
+    \vspace{1in}
+    
+    \vfill
+\end{titlepage}
+
+\clearpage
+% https://www.overleaf.com/project/6aad2c24d60089e26fec7155
+\thispagestyle{empty}
+\newpage
+\clearpage
+\chapter*{Abstract}
+\clearpage
+\chapter*{Declaration}
+I hereby certify that this dissertation, which is approximately [insert word count] words in length, has been composed by me, that it is the record of work carried out by me and that it has not been submitted in any previous application for a degree. This project was conducted by me at the University of St Andrews from [insert month/year] to [insert month/year] towards fulfilment of the requirements of the University of St Andrews for the degree of [insert degree title] under the supervision of [insert name].
+
+In submitting this project report to the University of St Andrews, I give permission for it to be published online. I retain the copyright in this work.
+\clearpage
+\tableofcontents
+\clearpage
+\chapter{Introduction}
+\clearpage
+\chapter{Background}
+	\R{Explain any relevant concepts that the reader needs to understand, citing any relevant literature. You may also describe potentially useful tools and technologies here.}
+
+ \section{Internet Protocol}
+The Internet Protocol (IP) is a network layer, layer 3, protocol that facilitates communication between end-points. The basic unit of data transferred by IP is a Datagram. A Datagram is a self-contained, independent piece of data that contains enough information to be forwarded from a source to destination without retaining per-packet state, i.e. an IP router 'forgets' about the Datagram as soon as it leaves the interface.\cite{postel_internet_1981}
+
+
+\R{ I want this paragraph to explain the key IP features/Mechanisms that are directly relevant to the comparison with NDN. Concepts a reader must know. Connectionless, No in network caching -- Has FIB state for routing) prefix routing, Mobility issues}
+
+\R{Very rough draft of background section for IP!}
+\subsection{Internet Protocol Addresses}
+ IP endpoints use a 32-bit fixed-length address for Internet Protocol Version 4 (IPv4) and a 128-bit fixed-length address for IPv6 respectively. 
+Addresses serve a dual purpose: to identify as addressable endpoint and to indicate the endpoints topological location for routing.\cite{postel_internet_1981}. IP addresses have resulted in several challenges that will be explored below.
+
+ \subsubsection{Address Space Exhaustion}
+ IP has faced issues with using addresses to identify endpoints as the original IPv4 used 32-bit addresses, which seemed sufficient at the time of IP's creation ($\sim$1981). The lack of address space faced by IPv4 resulted in additional network layer infrastrure. Classless-Inter-Domain-Routing was introduced to avoid rigid network classes that only allowed for coarse allocation of addresses.\cite{fuller_classless_1993} 
+CIDR allowed for arbitrary prefix lengths and route aggregation.
+This reduced the wastage of IPv4 addresses caused by assigning too large of a prefix and the routing aggregation allowed for reduced global routing table demands. However, there was still a fundamental lack of IPv4 addresses so Network Address Translation (NAT) was introduced\cite{egevang_ip_1994}. NAT allows for the re-use of a specific range of IP addresses\cite{rekhter_address_1996}. For instance, an endpoint may contain a globally routable address while the nodes downstream from this endpoint use addresses from the private NAT range.
+However, this NAT solution introduces more Points of Failure (PoF), disrupts direct network transparency, and increases the computational demand onto the middleboxes that must do address translation to correctly forward Datagrams downstream.
+
+
+It was realised that these solutions (CIDR ,NAT) would still not be suitable to support a future internet. IPv6 was created and provided larger 128-bit addresses. These 128-bit addressses allowed for a move away from NAT for IPv6 addresses where there exists enough addresses for every endpoint to be globally routable and removing the complexities that come with NAT. However, IPv6 is incompatible with IPv4 because of differently structured header formats so additional infrastructure had to be deployed to provide interfaces in which IPv4 and IPv6 could be translated and interoprable. 
+
+
+The issue of address exhaustion is not necessarily a problem arising from IP's architecture itself but rather from the unanticipated growth of the Internet. This unexpected growth meant that IPv4 had to be supported with additional network infrastructure. The move to IPv6 has created an Internet split between IPv4 and IPv6 and where infrastructure has to be carefully added to simultaneously support both IP versions.
+
+ \subsubsection{Address Semantics}
+ IP addresses acting as an identifier and topological locator creates some issues too. Namely, mobility where the identifier-location coupling is not suitable for Transmission Control Protocol (TCP) connections where a node is mobile. A TCP session is defined by a four-tuple of Source IP, Source port, Destination IP, and Destination port.\cite{postel_transmission_1981} When a TCP node then moves topological location it's IP addresses must also change for routing purposes. This breaks the TCP session and another must be initiated if necessary, which increases latency as well as retransmissions if the session partner is forwarding to the previous IP address before it is updated with the new address. This is unsustainable especially for highly mobile nodes such as a drone which may conceivably move several times in rapid sucession. To counter the issue of mobility, additional complexities must be introduced such as introducing overlay routing like Mobile IP \cite{perkins_ip_1996}, or multipath-capable transport protocols such as Multi-Path TCP and QUIC.\cite{wischik_design_nodate}\cite{langley_quic_2017}
+
+ \subsection{Forwarding \& Routing}
+ 
+
+
+\section{Named Data Networking}
+\subsection{NDN Addressing}
+\subsection{Packet Types}
+NDN uses two packet types, Interest and Data packets.
+\subsubsection{Interest Packets}
+\subsubsection{Data Packets}
+\subsection{Forwarding \& Routing}
+\R{Interest/Data Packets\newline 
+-- Forwarding and Routing (FIB/PIT)\newline Using prefixes like IP but with named data. Hierarchical, unbounded name space -- look up cost for variable length names affects scalability.\newline 
+In network state (CS) and adaptive forwarding etc}
+\par
+\section{Architectural Comparison}
+\clearpage
+\chapter{Context Survey}
+	Survey the context of the problem: citing, discussing and comparing any work in this area with similar aims reported in textbooks, research papers, or in publicly available software. You may also wish to position your project within the literature here.
+
+    Several papers have investigated how the performance of NDN and IP differ based on a given model application. As shown by \cite{gundogan_ndn_2018,luo_ipndn_2018,kumar_comparing_2022}, these papers provide an NDN comparison against IP in a multitude of different scenarios. These scenarios range from Internet of Things (IoT) applications where traffic follows a bursty pattern, to file transfer applications with high-throughput traffic. These comparisons mostly focus on a TCP/IP format although some feature User Datagram Protocol (UDP) either used with IP or as a way to run NDN over IP through a UDP overlay and then compare the two.\cite{jacobson_networking_2009}.
+    
+    The literature reviewed shows that the methodologies used can be vastly different. Experiments are conducted using several different methods. Common methods include using test-beds where routers use an NDN implementation, using existing networks where NDN packets are tunneled within an IP-based transport protocol, and using simulation, commonly ns-3. 
+
+    
+
+    
+
+\R{Original Van jacobson paper focuses on NDN ran as an IP overlay and a single application 
+
+ --Mapping landscape of what others have done, what did they test, how did they run NDN,
+
+ --How did different applications affect each architecture within the literature.
+
+
+ --Report methods and findings of literature
+
+--Methodology -- traffic patterns -- Caching/forwarding groups for lit review.
+
+ --Conclude by identifying research gap this project fits into
+
+ Previous comparisons between NDN and IP have been conducted across a range of experimental frameworks and traffic patterns. Several comparisons implement NDN as an overlay on top of existing IP infrastructure 
+ }
+    
+ 
+--bad vs good project?
+
+\clearpage
+\chapter{Plan}
+\noindent
+\hspace{-2.7cm}
+\begin{ganttchart}[
+    hgrid,
+    vgrid,
+    x unit=0.70cm,
+    y unit chart=0.8cm,
+    y unit title=0.8cm,
+    bar height=0.5
+]{1}{20}
+
+\gantttitle{Week}{20} \\
+\gantttitlelist{1,...,20}{1} \\
+
+\ganttbar{Complete DOER form}{1}{1} \\
+\ganttbar{Plan \& Context Survey}{2}{2} \\
+\ganttbar{Research \& Readings}{1}{16} \\
+\ganttbar{Setting up ns-3 simulator}{2}{2} \\
+\ganttbar{Establish Traffic Patterns}{3}{6} \\
+\ganttbar{Conduct Simulations}{4}{9} \\
+\ganttbar{Writing \& Editing}{2}{18} \\
+\ganttbar{Investigate Caching Policies}{11}{15} \\
+\ganttbar{Investigate Forwarding Strategies}{13}{17} \\
+\ganttmilestone{DOER 18/09/2026}{1} \\
+\ganttmilestone{Plan \& Context Survey 25/09/2026}{2} \\
+\ganttmilestone{Interim Demo 13/11/2026}{9} \\
+\ganttmilestone{Final Submission 15/01/2027}{18}
+\end{ganttchart}
+
+\clearpage
+\chapter{Methodology}
+    --Accidentally wrote context survey as methodology --very very rough draft
+ 
+    
+    IP and NDN comparisons conducted by using a real network where the NDN architecture is realised by encapsulating the NDN packets within an IP Datagram can have several affects on the experimental results. Firstly, the in-network caching of NDN cannot be fully deployed at every node in the network but rather only at specific NDN nodes. As such this would not show the 'true' results of an NDN implementation where every node natively NDN. Also, extra overheads which impact results are introduced because NDN packets must first be encapsulated into an IP Datagram and the IP Datagrams must be decapsulated into NDN packets.   
+
+
+    This project aims to use only simulation for conducting experiments.
+    Using simulation via ns-3 allows for a consistent, deterministic model where confounding variables are minimised.  A test-bed means that the implementation specific details can have a non-trivial impact on the experiment results. For instance, a router with an NDN implementation may be running code that is not optimized to the same level as an IP router, whose code has had decades of iterative optimisation. Also, the behaviors of a network that may impact results, such as congestion and varying link bandwidths are avoided. A simulator based approach allows for implementation details to have a minimised effect and the results to be more representative of the architecture themselves.
+\clearpage
+\chapter{Results}
+\clearpage
+\chapter{Discussion}
+\clearpage
+\chapter{Evaluation and critical appraisal}
+\clearpage
+\chapter{Conclusions and further work}
+\clearpage
+\chapter*{Abbreviations}
+\begin{acronym}[MPTCP]
+\acro{CIDR}{Classless Inter-Domain Routing}
+\acro{IP}{Internet Protocol}
+\acro{IPv4}{Internet Protocol Version 4}
+\acro{IPv6}{Internet Protocol Version 6}
+\acro{TCP}{Transmission Control Protocol}
+\acro{MPTCP}{Multipath Transmission Control Protocol}
+\acro{NAT}{Network Address Translation}
+\acro{PoF}{Points of Failure}
+\acro{NDN}{Named Data Networking}
+\acro{FIB}{Forwarding Information Base}
+\acro{CS}{Content Store}
+\acro{PIT}{Pending Interest Table}
+\end{acronym}
+\clearpage
+\printbibliography[heading=bibnumbered,title={References}]
+\clearpage
+\chapter{Appendix: ethics}
+\clearpage
+\chapter{Appendix: optional further material}
+
+
+
+\clearpage
+
+
+
+
+\end{document}
+
+
