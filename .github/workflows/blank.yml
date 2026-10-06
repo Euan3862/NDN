@@ -5,7 +5,6 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
-# Give the workflow permission to commit the CSV updates back to the repo
 permissions:
   contents: write
 
@@ -21,7 +20,7 @@ jobs:
           curl -sL https://raw.githubusercontent.com/pleac/texcount/master/texcount.pl -o texcount.pl
           chmod +x texcount.pl
 
-- name: Calculate Word Count
+      - name: Calculate Word Count
         id: count
         run: |
           TEX_FILE="main.tex"
@@ -37,17 +36,15 @@ jobs:
           echo "word_count=$WORD_COUNT" >> $GITHUB_OUTPUT
           echo "Current word count: $WORD_COUNT"
 
-- name: Update Word History CSV
+      - name: Update Word History CSV
         run: |
           DATE=$(date '+%Y-%m-%d %H:%M')
           COUNT="${{ steps.count.outputs.word_count }}"
           
-          # Create file with headers if it doesn't exist
           if [ ! -f "word_history.csv" ]; then
             echo "date,count" > word_history.csv
           fi
           
-          # Append the new entry
           echo "$DATE,$COUNT" >> word_history.csv
 
       - name: Pull latest changes before pushing
