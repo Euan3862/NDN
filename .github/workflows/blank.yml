@@ -21,10 +21,10 @@ jobs:
           curl -sL https://raw.githubusercontent.com/pleac/texcount/master/texcount.pl -o texcount.pl
           chmod +x texcount.pl
 
-      - name: Calculate Word Count
+- name: Calculate Word Count
         id: count
         run: |
-          TEX_FILE=$(find . -name "*.tex" -not -path "*/.*" | head -n 1)
+          TEX_FILE="main.tex"
           echo "Found LaTeX file: $TEX_FILE"
           
           RAW_COUNT=$(perl texcount.pl -1 -sum -brief "$TEX_FILE" 2>/dev/null || echo "0")
