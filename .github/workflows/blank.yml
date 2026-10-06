@@ -1,0 +1,59 @@
+name: Track Overleaf Word Count
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+# Give the workflow permission to commit the CSV updates back to the repo
+permissions:
+  contents: write
+
+jobs:
+  track-word-count:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install TeXcount
+        run: sudo apt-get update && sudo apt-get install -y texcount
+
+      - name: Calculate Word Count
+        id: count
+        run: |
+          # Finds your main .tex file (adjust if yours is named differently, e.g., main.tex)
+          # This sums up the words in the main text body (excluding code/preamble)
+          TEX_FILE=$(find . -name "*.tex" -not -path "*/.*" | head -n 1)
+          echo "Found LaTeX file: $TEX_FILE"
+          
+          # Run texcount and parse out the word count number
+          # -sum=1 gives total word count, -inc can handle inputs if needed
+          RAW_COUNT=$(texcount -1 -sum -brief "$TEX_FILE" 2>/dev/null || echo "0")
+          WORD_COUNT=$(echo "$RAW_COUNT" | tr -dc '0-9')
+          
+          if [ -z "$WORD_COUNT" ]; then
+            WORD_COUNT=0
+          fi
+          
+          echo "word_count=$WORD_COUNT" >> $GITHUB_OUTPUT
+          echo "Current word count: $WORD_COUNT"
+
+      - name: Update Word History CSV
+        run: |
+          DATE=$(date '+%Y-%m-%d %H:%M')
+          COUNT="${{ steps.count.outputs.word_count }}"
+          
+          # Create file with headers if it doesn't exist
+          if [ ! -f "word_history.csv" ]; then
+            echo "date,count" > word_history.csv
+          fi
+          
+          # Append the new entry
+          echo "$("$DATE"),$COUNT" >> word_history.csv
+
+      - name: Commit and push changes to repo
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Auto-update word count history [skip ci]"
+          file_pattern: word_history.csv
