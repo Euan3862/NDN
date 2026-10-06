@@ -1,0 +1,60 @@
+name: Track Overleaf Word Count
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  track-word-count:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Official TeXcount
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y texlive-extra-utils
+
+      - name: Calculate Word Count
+        id: count
+        run: |
+          if [ ! -f "main.tex" ]; then
+            echo "FATAL ERROR: main.tex DOES NOT EXIST in the root directory."
+            exit 1
+          fi
+          
+          # Run texcount (-1 forces a single line, -sum adds it up, -merge includes subfiles)
+          RAW_OUTPUT=$(texcount -1 -sum -merge main.tex 2>&1)
+          echo "Raw texcount output: $RAW_OUTPUT"
+          
+          # Strip everything except numbers to prevent graph corruption
+          CLEAN_COUNT=$(echo "$RAW_OUTPUT" | tr -dc '0-9')
+          
+          if [ -z "$CLEAN_COUNT" ]; then
+            CLEAN_COUNT=0
+          fi
+          
+          echo "word_count=$CLEAN_COUNT" >> $GITHUB_OUTPUT
+          echo "Final extracted number: $CLEAN_COUNT"
+
+      - name: Update Word History CSV
+        run: |
+          DATE=$(date '+%Y-%m-%d %H:%M')
+          COUNT="${{ steps.count.outputs.word_count }}"
+          
+          if [ ! -f "word_history.csv" ]; then
+            echo "date,count" > word_history.csv
+          fi
+          
+          echo "$DATE,$COUNT" >> word_history.csv
+
+      - name: Commit and push changes to repo
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Auto-update word count history [skip ci]"
+          file_pattern: word_history.csv
