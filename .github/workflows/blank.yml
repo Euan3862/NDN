@@ -24,11 +24,9 @@ jobs:
       - name: Calculate Word Count
         id: count
         run: |
-          # Finds your main .tex file (adjust if yours is named differently)
           TEX_FILE=$(find . -name "*.tex" -not -path "*/.*" | head -n 1)
           echo "Found LaTeX file: $TEX_FILE"
           
-          # Run the downloaded perl script directly
           RAW_COUNT=$(perl texcount.pl -1 -sum -brief "$TEX_FILE" 2>/dev/null || echo "0")
           WORD_COUNT=$(echo "$RAW_COUNT" | tr -dc '0-9')
           
@@ -44,12 +42,10 @@ jobs:
           DATE=$(date '+%Y-%m-%d %H:%M')
           COUNT="${{ steps.count.outputs.word_count }}"
           
-          # Create file with headers if it doesn't exist
           if [ ! -f "word_history.csv" ]; then
             echo "date,count" > word_history.csv
           fi
           
-          # Append the new entry
           echo "$DATE,$COUNT" >> word_history.csv
 
       - name: Commit and push changes to repo
