@@ -53,8 +53,23 @@ jobs:
           
           echo "$DATE,$COUNT" >> word_history.csv
 
-      - name: Commit and push changes to repo
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Auto-update word count history [skip ci]"
-          file_pattern: word_history.csv
+ - name: Bulletproof Commit and Push
+        run: |
+          # 1. Setup bot identity
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # 2. Save our freshly updated CSV somewhere safe outside the repo
+          cp word_history.csv /tmp/word_history.csv
+          
+          # 3. Nuke local diverged history and perfectly match the live GitHub branch
+          git fetch origin main
+          git reset --hard origin/main
+          
+          # 4. Bring the updated CSV back
+          cp /tmp/word_history.csv word_history.csv
+          
+          # 5. Commit and push
+          git add word_history.csv
+          git commit -m "Auto-update word count history [skip ci]" || echo "No changes to commit"
+          git push origin main
