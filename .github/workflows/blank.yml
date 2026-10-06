@@ -20,41 +20,26 @@ jobs:
           curl -sL https://raw.githubusercontent.com/pleac/texcount/master/texcount.pl -o texcount.pl
           chmod +x texcount.pl
 
-      - name: Calculate Word Count
+- name: Calculate Word Count
         id: count
         run: |
-          TEX_FILE="main.tex"
-          echo "Found LaTeX file: $TEX_FILE"
+          # 1. Check if the file actually exists where you claim it is
+          if [ ! -f "main.tex" ]; then
+            echo "ERROR: main.tex not found in the root directory!"
+            exit 1 # Fail the build so you notice it
+          fi
+
+          # 2. Run texcount (-1 forces a single line output)
+          RAW_OUTPUT=$(texcount -1 -sum -merge main.tex 2>/dev/null)
+          echo "Raw texcount output: $RAW_OUTPUT"
           
-          RAW_COUNT=$(perl texcount.pl -1 -sum -brief "$TEX_FILE" 2>/dev/null || echo "0")
-          WORD_COUNT=$(echo "$RAW_COUNT" | tr -dc '0-9')
+          # 3. Aggressively strip everything except numbers
+          CLEAN_COUNT=$(echo "$RAW_OUTPUT" | tr -dc '0-9')
           
-          if [ -z "$WORD_COUNT" ]; then
-            WORD_COUNT=0
+          # 4. Fallback if empty
+          if [ -z "$CLEAN_COUNT" ]; then
+            CLEAN_COUNT=0
           fi
           
-          echo "word_count=$WORD_COUNT" >> $GITHUB_OUTPUT
-          echo "Current word count: $WORD_COUNT"
-
-      - name: Update Word History CSV
-        run: |
-          DATE=$(date '+%Y-%m-%d %H:%M')
-          COUNT="${{ steps.count.outputs.word_count }}"
-          
-          if [ ! -f "word_history.csv" ]; then
-            echo "date,count" > word_history.csv
-          fi
-          
-          echo "$DATE,$COUNT" >> word_history.csv
-
-      - name: Pull latest changes before pushing
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull origin main --rebase || true
-
-      - name: Commit and push changes to repo
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Auto-update word count history [skip ci]"
-          file_pattern: word_history.csv
+          echo "word_count=$CLEAN_COUNT" >> $GITHUB_OUTPUT
+          echo "Current word count: $CLEAN_COUNT"
