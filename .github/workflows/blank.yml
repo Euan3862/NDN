@@ -37,16 +37,24 @@ jobs:
           echo "word_count=$WORD_COUNT" >> $GITHUB_OUTPUT
           echo "Current word count: $WORD_COUNT"
 
-      - name: Update Word History CSV
+- name: Update Word History CSV
         run: |
           DATE=$(date '+%Y-%m-%d %H:%M')
           COUNT="${{ steps.count.outputs.word_count }}"
           
+          # Create file with headers if it doesn't exist
           if [ ! -f "word_history.csv" ]; then
             echo "date,count" > word_history.csv
           fi
           
+          # Append the new entry
           echo "$DATE,$COUNT" >> word_history.csv
+
+      - name: Pull latest changes before pushing
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull origin main --rebase || true
 
       - name: Commit and push changes to repo
         uses: stefanzweifel/git-auto-commit-action@v5
