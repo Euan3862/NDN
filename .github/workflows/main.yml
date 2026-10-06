@@ -28,11 +28,9 @@ jobs:
             exit 1
           fi
           
-          # Run texcount (-1 forces a single line, -sum adds it up, -merge includes subfiles)
           RAW_OUTPUT=$(texcount -1 -sum -merge main.tex 2>&1)
           echo "Raw texcount output: $RAW_OUTPUT"
           
-          # Strip everything except numbers to prevent graph corruption
           CLEAN_COUNT=$(echo "$RAW_OUTPUT" | tr -dc '0-9')
           
           if [ -z "$CLEAN_COUNT" ]; then
@@ -53,23 +51,18 @@ jobs:
           
           echo "$DATE,$COUNT" >> word_history.csv
 
- - name: Bulletproof Commit and Push
+      - name: Bulletproof Commit and Push
         run: |
-          # 1. Setup bot identity
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
-          # 2. Save our freshly updated CSV somewhere safe outside the repo
           cp word_history.csv /tmp/word_history.csv
           
-          # 3. Nuke local diverged history and perfectly match the live GitHub branch
           git fetch origin main
           git reset --hard origin/main
           
-          # 4. Bring the updated CSV back
           cp /tmp/word_history.csv word_history.csv
           
-          # 5. Commit and push
           git add word_history.csv
           git commit -m "Auto-update word count history [skip ci]" || echo "No changes to commit"
           git push origin main
