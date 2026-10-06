@@ -16,20 +16,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install TeXcount
-        run: sudo apt-get update && sudo apt-get install -y texcount
+      - name: Download TeXcount Script
+        run: |
+          curl -sL https://raw.githubusercontent.com/pleac/texcount/master/texcount.pl -o texcount.pl
+          chmod +x texcount.pl
 
       - name: Calculate Word Count
         id: count
         run: |
-          # Finds your main .tex file (adjust if yours is named differently, e.g., main.tex)
-          # This sums up the words in the main text body (excluding code/preamble)
+          # Finds your main .tex file (adjust if yours is named differently)
           TEX_FILE=$(find . -name "*.tex" -not -path "*/.*" | head -n 1)
           echo "Found LaTeX file: $TEX_FILE"
           
-          # Run texcount and parse out the word count number
-          # -sum=1 gives total word count, -inc can handle inputs if needed
-          RAW_COUNT=$(texcount -1 -sum -brief "$TEX_FILE" 2>/dev/null || echo "0")
+          # Run the downloaded perl script directly
+          RAW_COUNT=$(perl texcount.pl -1 -sum -brief "$TEX_FILE" 2>/dev/null || echo "0")
           WORD_COUNT=$(echo "$RAW_COUNT" | tr -dc '0-9')
           
           if [ -z "$WORD_COUNT" ]; then
@@ -50,7 +50,7 @@ jobs:
           fi
           
           # Append the new entry
-          echo "$("$DATE"),$COUNT" >> word_history.csv
+          echo "$DATE,$COUNT" >> word_history.csv
 
       - name: Commit and push changes to repo
         uses: stefanzweifel/git-auto-commit-action@v5
