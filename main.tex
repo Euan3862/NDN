@@ -112,6 +112,19 @@ The core 'atoms' of the NDN architecture are the Data and Interest packets which
 
 \R{Will likely complete this NDN intro section after the introduction as I think it may heavily overlap. -- I do not want to repeat too much!}
 
+\subsection{Pending Interest Table}
+     \begin{figure}[h!]
+     \centering
+  \includegraphics[scale=0.8, keepaspectratio]{PITexample.png}
+
+  \label{fig:birds}
+\end{figure}
+Within the NDN architecture each node maintains its own PIT. The PIT tracks outstanding requests and their incoming and outgoing interfaces. Maintaining the state of the outstanding requests allows for popularity of content to be tracked and used to inform caching decisions. Tracking the incoming interfaces is essential to provide Data packets a route back to the requester. Also, this means that multiple requests for the same content can be aggregated into one Interest packet where the Data can simply be forwarded to all incoming interfaces who requested the content, rather than each request independently sending its own request. The outgoing interfaces being tracked provides multiple benefits, namely loop-detection and adaptive network management. Loop-detection is introduced as if a node has sent an interest out of an interface and it receives this exact packet again this means it has been forwarded out and has looped back to the node, so the packet can be immediately dropped. Adaptive network management is realised through Data gathered by the PIT. For instance, the PIT maintains a timestamps of when packets have been forwarded to an outgoing interface which allows for round-time trips to be calculated as well as other statistics such as number of requests satisfied and the corresponding response times. This Data can be used to infer information about the network such as traffic and congestion which can be used to inform future forwarding decisions to try optimise performance.
+
+
+\subsection{Forwarding Information Base}
+
+
 \subsection{Packet Types}
 NDN uses two main packet types, Interest and Data packets, to realise its architecture.
 
@@ -131,17 +144,6 @@ Data packets are used to satisfy Interests. When an Interest reaches a node, the
 Once a node containing the data is reached, the Data packets will follow the exact path that the Interest took. At each hop towards the receiver, the PIT is checked to find from which interfaces the Interest request came from. This allows for the aggregation to be resolved where the Data can be sent to every interface that requested it. This process recurs through the nodes until all receivers have been satisfied.\cite{zhang_named_2014}
 
 
-The use of in-network state for forwarding, specifically the PIT, allows for adaptive network management. Metrics like number of requests and response time can be measured and used to inform forwarding decisions, which will be discussed in the Forwarding section.
-
-\subsection{Pending Interest Table}
-     \begin{figure}[h!]
-     \centering
-  \includegraphics[scale=0.8, keepaspectratio]{PITexample.png}
-  \caption{PIT example}{\small Mitigate DDoS Attacks in NDN by Interest Traceback. Huichen Dai , Yi Wang, Jindou Fan, Bin Liu Tsinghua University, China.}
-  \label{fig:birds}
-\end{figure}
-\R{I have realised I discussed PIT and FIB in the packet type sections before actually defining what they are}
-\subsection{Forwarding Information Base}
 
 \subsection{NDN Addressing}
 NDN addressing is designed around being opaque to the network and allowing applications to determine their own naming conventions. This allows naming to evolve orthogonally from the network.\cite{zhang_named_2014}Typically, names follow a hierarchical structure which lets applications indicate the context and relations of Data items. A hierarchical structure is essential for the scaling of network routing through aggregation (similar to CIDR in IP) to keep FIB tables manageable. In a global environment, Data names must be unique for identification purposes. \R{---For instance, an Interest with the name /google/gmail/... indicates the Interest should be forwarded towards the node with the longest-matching prefix.---Not a good sentence} Non-hierarchical, or 'flat-names' can be used but they are more suited to local environments. 
