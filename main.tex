@@ -9,8 +9,12 @@
 \usepackage{titlesec}
 \usepackage{pgfgantt}
 \usepackage{pdflscape}
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta}
+\usepackage{tabularx}
 \usepackage{parskip}
 \usepackage{xcolor}
+\usepackage{array}
 \usepackage{acronym}
 \usepackage[
     backend=biber,
@@ -71,10 +75,10 @@ Internet Protocol (IP) provides a core abstraction to bridge the gap between lay
      \begin{figure}[h!]
      \centering
   \includegraphics[scale=0.4, keepaspectratio]{IPthinwaist.png}
-  \caption{7-layer Network Model}{\small https://named-data.net/project/execsummary/}
+  \caption{7-layer Network Model}
   \label{fig:birds}
+  \cite{zhang_named_2014}
 \end{figure}
-\R{Is there a better way to source a figure?}
 IP is a network layer, layer 3, protocol that facilitates communication between end-points. The basic unit of data transferred by IP is a Datagram. A Datagram is a self-contained, independent piece of data that contains enough information to be forwarded from a source to destination without retaining per-packet state, i.e. an IP router 'forgets' about the Datagram as soon as it leaves the interface.\cite{postel_internet_1981}
 %\R{ I want this paragraph to explain the key IP features/Mechanisms that are directly relevant to the comparison with NDN. Concepts a reader must know. Connectionless, No in network caching -- Has FIB state for routing) prefix routing, Mobility issues}
 
@@ -112,7 +116,10 @@ The issue of address exhaustion is not necessarily a problem arising from IP's a
 To properly explore the NDN architecture, Information Centric Networking (ICN) and related architecture (CCNx) must firstly be established. ICN introduced the overarching concept of focussing on naming data, rather than a host, and was first suggested by Van Jacobson in 2009.\cite{jacobson_networking_2009}. CCNx and NDN are the two most prominent realisations of the ICN architecture. CCNx and NDN share very similar properties, and even the same codebase until 2013\cite{noauthor_ndn_nodate}. However, NDN and CCNx now differ amongst implementation and protocol specific details, such as NDN placing more emphasis on security where every Data packet must be cryptographically signed by its producer's key.\cite{amuda_revolutionizing_2024}
 
 
+
 NDN replaces the traditional concept of a network interface with a 'Face'. While  traditional IP maps an interface to a physical hardware port (such as Ethernet or Wi-Fi), an NDN Face is a pure abstraction. A Face can represent a physical network link or an overlay (such as TCP or UDP). This abstraction allows for a decoupling of routing from hardware and allows NDN to work natively over a diverse range of networks without requiring lower-level adaptations.
+
+
 
 The core 'atoms' of the NDN architecture are the Data and Interest packets which facilitate the transfer of content. A Forwarding Interest Base (FIB), similar to an IP FIB, maps name-prefixes to the next-hop Face. A Pending Interest Table (PIT), a core part of NDN's stateful Data plane, maintains the state of content requests and allows Data to reach the corresponding consumers.
 
@@ -124,14 +131,15 @@ NDN addressing is designed around being opaque to the network and allowing appli
 NDN uses two main packet types, Interest and Data packets, to realise its architecture.
 
 \subsubsection{Interest Packets}
-Interest packets, or 'Interests', are issued by receivers, i.e. those who are requesting Data, and contain the name of Data they are interested in, along with metadata such as freshness requirements of Data. Interests are routed using the information in the FIB which indicates the next network hop that will lead towards a response, similarly to IP's routing tables. At each router, an Interest will update the router's PIT. The PIT will then contain an entry for this specific Interest which typically indicates the name of the Data requested, the incoming Faces that requested this Data, and a nonce and lifetime value which are used to prevent routing loops. 
+Interest Packets, or 'Interests', are issued by receivers, i.e. those who are requesting Data, and contain the name of Data they are interested in, various optional fields for asserting requirements on Data, and a Nonce.
+
+The first iteration of the NDN Interest Packet format included a 'Selectors' field, which was a dynamic field for asserting requirements on Data, first appearing in the foundational NDN paper \cite{zhang_named_2014}, and could filter for order prefences, specific publishers,  etc.
+However, this dynamic selection of filters introduced significant computational overheads by requiring heavy parsing and look-up logic at routers which interferred with forwarding performance. To counter this, the Interest Packet converted these filters to lightweight flags, rather than complex header fields.
 
 
-If an Interest is forwarded to a router and an entry for the requested Data already exists within the router's PIT, then the newest request can simply 'wait' at that router for the outgoing request to return. This aggregation is how the flow-control of NDN is realised, i.e. for one Data item, only one interest will be issued which prevents unnecessary network and producer load.
+\R{Description of TLV??}
+The foundational Interest packet structure is shown in \cref{fig:interest_packet}, and the current (2026) Interest Packet structure is shown in \cref{fig:interest_packet2} \cite{noauthor_changes_nodate}.
 
-
-
-An Interest does not have to reach the destination of a Data producer as it is able to be satisfied by aggregation as mentioned, or by intermediate routers Content Stores, which will be discussed in a following section.
 \begin{figure}[h!]
     \centering
     \begin{tikzpicture}[
@@ -144,17 +152,51 @@ An Interest does not have to reach the destination of a Data producer as it is a
         \node[box, anchor=north] (nonce) at (selectors.south) {Nonce};
         \node[box, anchor=north] (guiders) at (nonce.south) {Guiders \\ \small (scope, Interest lifetime)};
     \end{tikzpicture}
-    \caption{Structure of an NDN Interest Packet.}
+    \caption{Structure of an NDN Interest Packet. \cite{zhang_named_2014}}
     \label{fig:interest_packet}
 \end{figure}
+
+\begin{itemize}
+    \item \textbf{Name:} The Name within an Interest contains the name of the Data, or a prefix of the Data's name, which it is requesting. This Name is crucial for forwarding an Interest towards the longest-prefix matching Data.
+    \item \textbf{Selectors:} The Selectors, as aforementioned, now contain their own dedicated bytes and are used for filtering Data that is able to satisfy an Interest. Selectors commonly used include order CanBePrefix, HopLimit, and MustBeFresh, although these are optional fields.
+    \begin{itemize}
+        \item \textbf{CanBePrefix:} This enables a requester to enforce a strict name matching, or not, on Data. For instance, if CanBePrefix is chosen to be a true value then this allows for an Interest with the name /uk/ac/st-andrews/cs/handbook/2026/ to be satisfied by any Data who's name is a valid match for this prefix. I.e, any page from the 2026 handbook could be returned to the Interest sender.
+        \item \textbf{HopLimit:} This allows for an Interest to enforce requirements a topological distance limit on it's Interest. This could be used for something like ensuring an Interest is only satisfied within a local network.
+        \item \textbf{MustBeFresh:} This ensures that the Data satisfying the Interest is still valid and has not become stale, which is indicated by the Freshness Period within the Data packets meta information (Further discussed in the Data packet section).
+    \end{itemize}
+    \item \textbf{Nonce:} Every Interest packet must contain a Nonce which is a randomly generated 4-octet long byte-string \cite{noauthor_changes_nodate}. The Nonce coupled with the Interest's Name enables the unique identification of Interest's which is typically used for detecting looping Interests.
+\end{itemize}
+
+\begin{figure}[h!]
+    \centering
+    \begin{tikzpicture}[
+        font=\sffamily,
+        box/.style={draw, rectangle, minimum width=7cm, align=center, thick, inner sep=1.2ex}
+    ]
+        % Modern v0.3 Interest Packet Stack
+        \node[box] (name) {Name};
+        \node[box, anchor=north] (canbeprefix) at (name.south) {\texttt{CanBePrefix} \small (optional)};
+        \node[box, anchor=north] (mustbefresh) at (canbeprefix.south) {\texttt{MustBeFresh} \small (optional)};
+        \node[box, anchor=north] (forwardinghint) at (mustbefresh.south) {\texttt{ForwardingHint} \small (optional)};
+        \node[box, anchor=north] (nonce) at (forwardinghint.south) {Nonce};
+        \node[box, anchor=north] (lifetime) at (nonce.south) {\texttt{InterestLifetime} \small (optional)};
+        \node[box, anchor=north] (hoplimit) at (lifetime.south) {\texttt{HopLimit} \small (optional)};
+        \node[box, anchor=north] (params) at (hoplimit.south) {ApplicationParameters \\ \small (with optional InterestSignature)};
+    \end{tikzpicture}
+    \caption{Structure of a Modern NDN Interest Packet}
+    \label{fig:interest_packet2}
+    \cite{noauthor_changes_nodate}
+\end{figure}
+
 \subsubsection{Data Packets}
-Data packets are the packets which contain a Data payload and satisfy Interests. Data packets contain multiple sections including its name, Meta information, Content, and Signature. 
+Data Packets are the packets which contain a Data payload and satisfy Interests. Data packets contain multiple sections including its name, Meta information, Content, and Signature. 
 \begin{itemize}
     \item \textbf{Name:} As discussed within the Addressing section the name of a Data packet is a variable-length, application-chosen name.
-    \item \textbf{Meta information:} Each Data packet contains meta information such as Content Type and Freshness Period. Content Type enables routers to differentiate between different types of payloads such as generic data payloads versus a cryptographic public key. This is essential to inform routers how to properly treat a packet without requiring complex deep packet inspection. The freshness period field is also essential for differentiating between the recentness of the data. For example, a CS of an intermediate router may contain data from an IoT sensor reading and could satisfy a request for this data. However, the cached data may not be completely up to date so this Freshness field ensures the most recent data is returned.
+    \item \textbf{Meta information:} Each Data packet contains meta information such as Content Type and Freshness Period. Content Type enables routers to differentiate between different types of payloads such as generic data payloads versus a cryptographic public key. This is essential to inform routers how to properly treat a packet without requiring complex deep packet inspection. The freshness period field is essential for differentiating between the recentness of the data. For example, a CS of an intermediate router may contain data from an IoT sensor reading and could satisfy a request for this data. However, the Freshness Period informs the CS about how long the Data is valid before becoming stale.
     \item \textbf{Content:} The Content field contains the actual Data within the packet. 
     \item \textbf{Signature:} The Signature field enables the key principle of NDN's security, where security is provided natively through packets, rather than by providing a secure channel in which insecure packets can be transferred. The Signature field contains the Data producer's digital signature and a key locator so that the receiver of the packet can verify it is from the correct producer.
 \end{itemize}
+
 
  The meta information  When an Interest reaches a router, the router firstly checks its CS to check for matching Data. If the Data exists in the CS, a matching Data packet can be issued to satisfy the Interest. Otherwise, the process discussed in the Interest packet section is followed. The PIT is checked for matching requests for aggregation purposes, otherwise the FIB is consulted to forward the Interest towards a router containing the Data.
 
@@ -172,14 +214,16 @@ Once a router containing the data is reached, the Data packets will follow the e
         \node[box, anchor=north] (content) at (metainfo.south) {Content};
         \node[box, anchor=north] (signature) at (content.south) {Signature \\ \small (signature type, key locator, \\[-0.5ex] \small signature bits, \dots)};
     \end{tikzpicture}
-    \caption{Structure of an NDN Data Packet.}
+    \caption{Structure of an NDN Data Packet. \cite{zhang_named_2014}}
     \label{fig:data_packet}
 \end{figure}
 
 
 
 \subsection{Routing}
+NDN routing is the process of populating the FIB, to provide names prefixes which Interests can be forwarded towards. NDN is able adapt conventional IP routing protocols such as Open Shortest Path First and Border Gateway Protocol to propogate name prefixes rather than IP subnets. Routing follows a longest-prefix matching approach where an Interest will be forwarded towards the longest-prefix matching entry in the FIB \cite{zhang_named_2014}.
 
+As NDN routing is concerned with Names, rather than a topologically based address, this enables native multihoming where one Name can have multiple FIB entries with different outgoing Faces.
 
 \subsection{The Forwarding Plane}
 
@@ -193,6 +237,20 @@ However, not every router is required to maintain a CS if it is unsuitable. The 
 Even on routers with a constrained memory capacity, such as home routers, CSs can provide significant performance benefits. Although a home router may have a relatively small memory capacity, home networks commonly exhibit high temporal locality which is especially advantageous for caching \cite{dabirmoghaddam_understanding_2014}. For instance, multiple members of a home network may be independently streaming a popular movie, and caching this movie Data enables the CS to satisfy subsequent Interests locally.
 
 \subsubsection{Forwarding Information Base}
+A Forwarding Information Base (FIB) is located at each router within an NDN network and provides a mapping of prefixes to outgoing Faces. This information is used to forward Interests towards Data by forwarding the Interest towards the Face with longest-matching prefix of the Interests Name.
+
+\begin{figure}[h!]
+    \centering
+    \begin{tabular}{|l|l|}
+    \hline
+    \textbf{Name Prefix} & \textbf{Outgoing Faces} \\ \hline
+    \texttt{/uk/ac/st-andrews} & 1, 3 \\ \hline
+    \texttt{/com/google/scholar} & 4 \\ \hline
+    \texttt{/org/wikipedia/wiki} & 2, 5, 6 \\ \hline
+    \end{tabular}
+    \caption{Example Forwarding Information Base}
+    \label{tab:fib_example}
+\end{figure}
 
 \subsubsection{Pending Interest Table}
 Each router in the NDN architecture maintains a Pending Interest Table (PIT) to track outstanding requests. The PIT maps the Name Prefix of a pending Interest to its incoming Face (the Face that requested the Data) and its outgoing Face (the Face the Interest was forwarded to). This stateful architecture natively enables Request Aggregation. If a router receives multiple Interest for the same Name Prefix, it stops duplicate transmissions. Instead of forwarding redundant traffic upstream, the router simply appends the new incoming Faces to the existing PIT entry (as shown in \cref{fig:pit_aggregation_tables}). This acts as a flow-control mechanism ensuring a strict 1:1 ratio of Interests to Data packets on any given link. This significantly reduces overall network congestion and protects upstream producers from becoming overloaded.
@@ -248,29 +306,34 @@ Furthermore, these PIT entries inform forwarding and management logic. The incom
     \draw[->, thick, dashed] (event.south) -- (table2_label.north);
 
     \end{tikzpicture}
-    \caption{PIT state transition during Interest aggregation. When a duplicate request arrives for the \texttt{st-andrews} prefix on Face 12, the router does not forward it upstream and simply appends the new incoming Face.}
+    \caption{PIT state during Interest aggregation. When a duplicate request arrives for the \texttt{st-andrews} prefix on Face 12, the router does not forward it upstream but simply appends the new incoming Face to existing PIT entry.}
     \label{fig:pit_aggregation_tables}
 \end{figure}
-
+\clearpage
 \subsection{The Forwarding Process}
+NDN is fundamentally Interest driven where Data is only transmitted when there is a matching Interest. As such, all communication begins with an Interest. At each router in the NDN network, an Interest follows a strict set of checks for Data as shown in \cref{fig:sm}. These checks include the router's CS, PIT, and FIB.
+
+\begin{itemize}
+    \item \textbf{Content Store:} At each router, the router's CS is checked for the requested Data. If the Data is within the CS, the router can satisfy the Interest locally.
+    \item \textbf{Pending Interest Table:} If the Data is not within the CS, the PIT is checked for entries with matching Interests. If a matching PIT entry exists, Interest aggregation can occur and the Interest can be dropped.
+    \item \textbf{Forwarding Information Base:} If there is no matching entry in the PIT then the FIB must be consulted. The longest-matching prefix from the FIB is used to forward the Interest towards the next suitable hop.
+\end{itemize}
+This process continues until the Interest has been satisfied or has reached an invalid state such as a time-out or hop-count has been reached.
+
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.8\textwidth]{InterestSM.png}
+  \includegraphics[width=1\textwidth]{InterestSM.png}
   \caption{NDN packet process (Source: \cite{ko_peks-based_2020}).}
   \label{fig:sm}
 \end{figure}
 
 
 
-\R{Keep data and interest packet sections super tight just explaining data structure}
+\R{Keep data and interest packet sections tight just explaining data structure}
 
 
 
-
-
-%-- Forwarding and Routing (FIB/PIT)\newline Using prefixes like IP but with named data. Hierarchical, unbounded name space -- look up cost for variable length names affects scalability.\newline 
-%In network state (CS) and adaptive forwarding etc}
 
 \clearpage
 
@@ -288,11 +351,47 @@ Furthermore, these PIT entries inform forwarding and management logic. The incom
     The literature evaluating NDN against IP-based applications contains several different traffic patterns. Primarily, high-throughput and bursty workloads. Early baseline comparisons such as the original prototype evaluation by Jacobson et al \cite{jacobson_networking_2009}, used continuous bulk file transfers to measure throughput differences. Luo et al. also modelled high-throughput File Transfer Protocol (FTP) transfers of 4480K bytes to investigate how NDN's in-network caching sped up repeated file requests compared to TCP, where there's no benefit to repeated requests, even if related. Nguyen et al.\cite{nguyen_cross-layer_2022} investigated how Information-Centric Networking (ICN) could be designed to reduce energy usage within IoT networks compared to IP. While these studies shows NDN is capable of dealing with large bulk file transfers and resource constrained IoT networks, they do not represent NDN's performance on a variety of different applications.
     Investigations within disruption prone environments modelled significantly different traffic patterns. Gungdogan et al. and Nguyen et al, used periodic requests to model the irregular, bursty traffic seen within Internet of Things devices \cite{gundogan_ndn_2018}\cite{nguyen_cross-layer_2022}. Unlike these specific traffic patterns, some studies do not define their traffic patterns at all. Kumar et al. evaluated average delay and jitter by increasing incrementally increasing data rates without specifying a specific application they are attempting to model\cite{kumar_comparing_2022}. This focus on either niche application types or undefined generic traffic leaves a gap in the literature which shows the need for a comprehensive simulation that evaluates NDN across a variety of well-defined traffic patterns.
 
+\begin{table}[h!]
+    \centering
+    \begin{tabularx}{\textwidth}{@{} l >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X @{}}
+    \toprule
+    \textbf{Paper} & \textbf{Traffic Pattern} & \textbf{Objective} \\ 
+    \midrule
+    Jacobson et al. \cite{jacobson_networking_2009} & Continuous bulk file transfers & Baseline throughput measurement \\ \addlinespace
+    Luo et al. \cite{luo_ipndn_2018} & High-throughput File Transfer Protocol (FTP) transfers (4480K bytes) & Evaluating in-network caching efficiency on repeated requests \\ \addlinespace
+    Gündoğan et al. \cite{gundogan_ndn_2018} & Periodic requests for IoT sensor data & Disruption-prone, multi-hop IoT environments \\ \addlinespace
+    Nguyen et al. \cite{nguyen_cross-layer_2022} & Poisson-distributed requests (5 packets/sec) with Zipf content popularity & IoT energy usage and selective caching evaluation \\ \addlinespace
+    Kumar et al. \cite{kumar_comparing_2022} & Incremental data rate scaling (undefined application) & Generic delay and jitter benchmarking \\ 
+    \bottomrule
+    \end{tabularx}
+    \caption{Summary of traffic modelling approaches in existing literature.}
+    \label{tab:traffic_models}
+\end{table}
+\clearpage
+
+
     \section{Methodological Approaches}
     The environments used to compare NDN against IP protocols vary significantly from IP-overlays to pure software simulations, with each approach having its own advantages and disadvantages. Early studies such as the prototype testing by Jacobson et al, evaluated NDN by encapsulating Interest and Data packets within a UDP/IP overlay. Encapsulating packets introduced an additional 22\% header overhead and diminished the performance of native NDN as it reduced the utilisation of its in-network state and caching \cite{jacobson_networking_2009}. To evaluate legacy applications without altering code to suit NDN, Luo et al. implemented a transport-layer mechanism on a physical NDN test-bed. However, the hardware demands meant their evaluation was restricted to a very simple topology of only four NDN routers\cite{luo_ipndn_2018}. Nguyen et al.\cite{nguyen_cross-layer_2022} evaluated ICN through an IoT network simulated in ndnSIM. The network was modelled using one thousand concurrent users with requests following a Poisson distribution, and a rate of five interest packets per second. The content popularity followed a Zipf distribution which informed Content Store caching decisions. However, their network model was a generic multi-layer topology which is relatively simple and therefore their results may differ in a more complex, real-world, topology.
 
     Although physical test-beds provide real-world environmental factors, they introduce hardware limitations that disadvantage NDN's architecture. For instance, when Gundogan et al. deployed protocols on a physical Internet of Things sensor test-bed they showed NDN was superior in scenarios requiring multi-hop resilience, but found that the physical RAM constraints of the IoT hardware caused bottlenecks when maintaining state such as the Pending Interest Table and Content Store\cite{gundogan_ndn_2018}. To avoid these hardware bottlenecks and encapsulation overheads, studies have increasingly adopted simulation to evaluate NDN and IP. Studies used the ns-3 simulator to reduce hardware noise and focus on the pure architectural performance differences.\cite{kumar_comparing_2022}\cite{nguyen_cross-layer_2022}. While current literature uses the ns-3 simulator to differentiate between architectural differences and hardware noise, a gap remains in evaluating these protocols across a variety of well-defined traffic patterns.
 
+\begin{table}[h!]
+    \centering
+    \begin{tabularx}{\textwidth}{@{} l >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X @{}}
+    \toprule
+    \textbf{Paper} & \textbf{Environment} & \textbf{Key Advantages} & \textbf{Limitations} \\ 
+    \midrule
+    Jacobson et al. \cite{jacobson_networking_2009} & UDP/IP overlay prototype & Early functional demonstration & 22\% header overhead; reduced caching utilisation \\ \addlinespace
+    Luo et al. \cite{luo_ipndn_2018} & Physical NDN test-bed with transport mechanism & Real-world legacy application support & Restricted to a simple 4-router topology \\ \addlinespace
+    Gündoğan et al. \cite{gundogan_ndn_2018} & Physical IoT sensor hardware test-bed & Realistic multi-hop resilience evaluation & Hardware RAM bottlenecks causing PIT/CS overflows \\ \addlinespace
+    Nguyen et al. \cite{nguyen_cross-layer_2022} & ndnSIM (ns-3 framework) & Large-scale user simulation (1,000+ users) & Simplified, generic network topologies \\ \addlinespace
+    Kumar et al. \cite{kumar_comparing_2022} & ns-3 simulator & Isolation of architectural performance from hardware noise & Lack of complex, application-specific traffic definitions \\ 
+    \bottomrule
+    \end{tabularx}
+    \caption{Comparison of experimental approaches and trade-offs in current literature.}
+    \label{tab:experimental_approaches}
+\end{table}
+\clearpage
     \section{Performance Results \& Architectural trade-offs}
     Throughout the literature evaluated, NDN consistently shows that its performance advantages are realised by its in-network state and caching capabilities. Luo et al found that caching lead to significantly lower transmission times for repeated file requests \cite{luo_ipndn_2018}. The caching similarly reduces average delay across simulated topologies \cite{kumar_comparing_2022}. In highly disruptive, multi-hop environments, caching allows for dropped packets to be retrieved from intermediate routers rather than the original producer which allows NDN to outperform IP protocols like CoAP and MQTT in terms of reliability. \cite{gundogan_ndn_2018}. Also, Jacobson et al. demonstrated that with sufficient receiver-driven pipelining, NDN's Interest-Data flow can achieve the same throughput as highly optimised TCP implementations \cite{jacobson_networking_2009}. Nguyen et al\cite{nguyen_cross-layer_2022} achieved a 20\% power saving compared to existing IP designs for IoT networks where a custom selective caching strategy was implemented. This custom strategy uses 'hot' and 'cold' caching queues where popular content is stored closer to the network edges and allows for content to be retrieved with less network traffic. 
 
