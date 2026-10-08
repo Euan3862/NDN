@@ -19,7 +19,17 @@
 </head>
 <body>
 
+<div class="card">
+    <h1>Overleaf Word Count Tracker</h1>
+    <div class="stats">
+        <div class="stat-box">
+            <h3 id="currentCount">Loading...</h3>
+            <span>Current Word Count</span>
+        </div>
+    </div>
 
+    <canvas id="wordChart"></canvas>
+</div>
 
 <script>
     async function loadChart() {
