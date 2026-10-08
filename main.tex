@@ -75,9 +75,8 @@ Internet Protocol (IP) provides a core abstraction to bridge the gap between lay
      \begin{figure}[h!]
      \centering
   \includegraphics[scale=0.4, keepaspectratio]{IPthinwaist.png}
-  \caption{7-layer Network Model}
-  \label{fig:birds}
-  \cite{zhang_named_2014}
+  \caption{7-layer Network Model \cite{zhang_named_2014}}
+  \label{fig:IP-thinwaist}
 \end{figure}
 IP is a network layer, layer 3, protocol that facilitates communication between end-points. The basic unit of data transferred by IP is a Datagram. A Datagram is a self-contained, independent piece of data that contains enough information to be forwarded from a source to destination without retaining per-packet state, i.e. an IP router 'forgets' about the Datagram as soon as it leaves the interface.\cite{postel_internet_1981}
 %\R{ I want this paragraph to explain the key IP features/Mechanisms that are directly relevant to the comparison with NDN. Concepts a reader must know. Connectionless, No in network caching -- Has FIB state for routing) prefix routing, Mobility issues}
@@ -105,11 +104,7 @@ The issue of address exhaustion is not necessarily a problem arising from IP's a
 
  \subsection{Forwarding \& Routing}
  IP is built upon a stateful routing and stateless forwarding. Routing is a control plane computation which decides where an IP Datagram should be sent to get it towards its destination. Routing tables are used to store these paths. Routing tables contain IP addresses and a Datagram is forwarded to the interface with the longest matching prefix. As aforementioned, each IP Datagram is independent and contains the information required to send it to a given destination. Therefore, forwarding does not require any state and once an IP Datagram is sent through an interface it can be 'forgotten'. This mechanism allows for connection state and transport-layer complexity (such as reliability and congestion control) to mostly be sent to network edges so that the network can focus on routing and forwarding Datagrams as fast as possible. This reduction of in-network state can be beneficial as less computation is required at each hop and Datagrams do not rely on the availability of previous routers.
- 
-\R{Not sure if it would be necessary to mention Routing protocols, I just wanted it to be emphasises that IP forwarding is stateless (in constrast to NDN).} 
 \clearpage
-
-
 
 
 \section{Named Data Networking}
@@ -198,7 +193,7 @@ Data Packets are the packets which contain a Data payload and satisfy Interests.
 \end{itemize}
 
 
- The meta information  When an Interest reaches a router, the router firstly checks its CS to check for matching Data. If the Data exists in the CS, a matching Data packet can be issued to satisfy the Interest. Otherwise, the process discussed in the Interest packet section is followed. The PIT is checked for matching requests for aggregation purposes, otherwise the FIB is consulted to forward the Interest towards a router containing the Data.
+When an Interest reaches a router, the router firstly checks its CS to check for matching Data. If the Data exists in the CS, a matching Data packet can be issued to satisfy the Interest. Otherwise, the process discussed in the Interest packet section is followed. The PIT is checked for matching requests for aggregation purposes, otherwise the FIB is consulted to forward the Interest towards a router containing the Data.
 
 
 Once a router containing the data is reached, the Data packets will follow the exact path that the Interest took. At each hop towards the receiver, the PIT is checked to find from which Faces the Interest request came from. This allows for the aggregation to be resolved where the Data can be sent to every Face that requested it. This process recurs through the routers until all receivers have been satisfied.\cite{zhang_named_2014}
