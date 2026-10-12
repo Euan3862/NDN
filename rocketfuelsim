@@ -1,0 +1,106 @@
+#include "ns3/core-module.h"
+#include "ns3/network-module.h"
+#include "ns3/ndnSIM-module.h"
+
+#include <iostream>
+#include <string>
+
+using namespace ns3;
+
+int
+main(int argc, char* argv[])
+{
+    CommandLine cmd;
+    cmd.Parse(argc, argv);
+
+    // 1. Load the Rocketfuel topology
+    RocketfuelWeightsReader reader;
+
+    reader.SetFileName("topologies/weights-scaled");
+    reader.SetFileType(RocketfuelWeightsReader::WEIGHTS);
+    NodeContainer nodes = reader.Read();
+
+    reader.SetFileName("topologies/latencies");
+    reader.SetFileType(RocketfuelWeightsReader::LATENCIES);
+    reader.Read();
+
+    // 2. Create point-to-point network links
+    reader.Commit();
+
+    NS_ABORT_MSG_IF(nodes.GetN() == 0,
+                    "No topology nodes loaded");
+
+    std::cout << "Loaded " << nodes.GetN()
+              << " nodes and "
+              << reader.GetLinks().size()
+              << " links." << std::endl;
+
+    // 3. Install the NDN stack
+    ns3::ndn::StackHelper ndnHelper;
+    ndnHelper.InstallAll();
+
+    // Apply imported routing weights to NDN faces
+    reader.ApplyOspfMetric();
+
+    // 4. Select forwarding strategy
+    ns3::ndn::StrategyChoiceHelper::InstallAll(
+        "/",
+        "/localhost/nfd/strategy/best-route"
+    );
+
+    // 5. Configure global NDN routing
+    ns3::ndn::GlobalRoutingHelper routingHelper;
+    routingHelper.InstallAll();
+
+    // 6. Find our two endpoints
+    Ptr<Node> consumer = Names::Find<Node>("London424");
+Ptr<Node> producer = Names::Find<Node>("Frankfurt498");
+
+    NS_ABORT_MSG_UNLESS(consumer && producer,
+                       "Consumer or producer node not found");
+
+    const std::string prefix = "/demo";
+
+    // 7. Consumer sends 5 Interests per second
+    ns3::ndn::AppHelper consumerHelper("ns3::ndn::ConsumerCbr");
+
+    consumerHelper.SetPrefix(prefix);
+    consumerHelper.SetAttribute("Frequency", StringValue("5"));
+
+   ApplicationContainer consumerApp =
+        consumerHelper.Install(consumer);
+
+    consumerApp.Start(Seconds(1.0));
+    consumerApp.Stop(Seconds(10.0));
+
+    // 8. Producer returns 1024-byte Data packets
+    ns3::ndn::AppHelper producerHelper("ns3::ndn::Producer");
+
+    producerHelper.SetPrefix(prefix);
+    producerHelper.SetAttribute("PayloadSize", StringValue("1024"));
+
+    ApplicationContainer producerApp =
+        producerHelper.Install(producer);
+  producerApp.Start(Seconds(0.5));
+
+    // 9. Advertise the prefix and calculate routes
+    routingHelper.AddOrigins(prefix, producer);
+    ns3::ndn::GlobalRoutingHelper::CalculateRoutes();
+
+    // 10. Record application and network statistics
+    ns3::ndn::AppDelayTracer::InstallAll(
+        "rocketfuel-delays.txt");
+
+    ns3::ndn::L3RateTracer::InstallAll(
+        "rocketfuel-rates.txt", Seconds(1.0));
+
+    // 11. Execute simulation
+    std::cout << "Starting simulation..." << std::endl;
+    Simulator::Stop(Seconds(11.0));
+    Simulator::Run();
+    Simulator::Destroy();
+
+    std::cout << "Simulation finished." << std::endl;
+
+    return 0;
+}
